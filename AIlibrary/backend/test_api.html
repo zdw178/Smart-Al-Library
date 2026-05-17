@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试SmartLib AI API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0069d9;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>测试SmartLib AI API</h1>
+    
+    <div class="test-section">
+        <h2>1. 健康检查</h2>
+        <button onclick="testHealth()">测试健康检查</button>
+        <div id="healthResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. 精确搜索</h2>
+        <input type="text" id="exactQuery" placeholder="输入搜索关键词" value="三体">
+        <button onclick="testExactSearch()">测试精确搜索</button>
+        <div id="exactResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. 智能搜索</h2>
+        <input type="text" id="smartQuery" placeholder="输入自然语言查询" value="想看探讨宇宙社会的科幻书">
+        <button onclick="testSmartSearch()">测试智能搜索</button>
+        <div id="smartResult" class="result"></div>
+    </div>
+
+    <script>
+        async function testHealth() {
+            const resultDiv = document.getElementById('healthResult');
+            resultDiv.textContent = '测试中...';
+            
+            try {
+                const response = await fetch('http://127.0.0.1:8000/health');
+                const data = await response.json();
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                resultDiv.textContent = '测试失败: ' + error.message;
+            }
+        }
+        
+        async function testExactSearch() {
+            const query = document.getElementById('exactQuery').value;
+            const resultDiv = document.getElementById('exactResult');
+            resultDiv.textContent = '测试中...';
+            
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/api/search/exact?query=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                resultDiv.textContent = '测试失败: ' + error.message;
+            }
+        }
+        
+        async function testSmartSearch() {
+            const query = document.getElementById('smartQuery').value;
+            const resultDiv = document.getElementById('smartResult');
+            resultDiv.textContent = '测试中...';
+            
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/api/search/smart?query=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                resultDiv.textContent = '测试失败: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
