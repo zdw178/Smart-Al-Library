@@ -316,7 +316,8 @@ const performSearch = async () => {
         : '/api/search/smart'
     
     try {
-      const response = await fetch('http://127.0.0.1:8001' + endpoint + '?query=' + encodeURIComponent(searchQuery.value))
+      const apiBase = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8001'
+      const response = await fetch(apiBase + endpoint + '?query=' + encodeURIComponent(searchQuery.value))
       if (!response.ok) {
         throw new Error('Search failed')
       }
@@ -374,7 +375,8 @@ const performSearch = async () => {
 const loadDiscoveryBooks = async () => {
   loading.value = true
   try {
-    const response = await fetch('http://127.0.0.1:8001/api/search/smart?query=' + encodeURIComponent('经典必读必看的好书，发人深省'))
+    const apiBase = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8001'
+    const response = await fetch(apiBase + '/api/search/smart?query=' + encodeURIComponent('经典必读必看的好书，发人深省'))
     if (response.ok) {
       const data = await response.json()
       if (data.results && data.results.length > 0) {
