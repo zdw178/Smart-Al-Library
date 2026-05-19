@@ -5,7 +5,7 @@
       :class="{'w-full md:w-2/5 aspect-[3/4] border-r border-outline-subtle': featured, 'w-full aspect-[3/4] border-b border-outline-subtle': !featured}"
     >
       <img 
-        :src="getBookCover(book.title)" 
+        :src="getBookCover(book.title, book.tags)" 
         :alt="book.title"
         class="w-full h-full object-cover"
       />
@@ -86,10 +86,7 @@
           </span>
           
           <div class="flex gap-2 w-full" :class="{'md:w-auto': featured}">
-             <button v-if="featured" class="btn-primary py-3 px-8 text-sm flex gap-2 items-center flex-1 md:flex-none justify-center shadow-lg shadow-primary/20">
-                阅读分析 <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
-             </button>
-             <button @click="addToLibrary" v-if="featured" class="btn-outline py-3 px-6 text-sm flex-1 md:flex-none justify-center">
+             <button @click="addToLibrary" v-if="featured" class="btn-primary py-3 px-8 text-sm flex gap-2 items-center flex-1 md:flex-none justify-center shadow-lg shadow-primary/20">
                 加入书库
              </button>
              <button v-if="!featured" @click="addToLibrary" class="btn-primary bg-accent-teal py-2 px-3 text-xs flex items-center gap-1 ml-auto mt-2 rounded-lg hover:bg-accent-teal/80 transition-colors">
@@ -104,6 +101,7 @@
 
 <script setup>
 import { supabase } from '../supabase.js'
+import { getBookCover } from '../coverUtils.js'
 
 const props = defineProps({
   book: {
@@ -198,7 +196,7 @@ const addToLibrary = async () => {
       author: props.book.author || '未知作者',
       call_number: props.book.call_number || '',
       status: '在馆',
-      cover_url: getBookCover(props.book.title)
+      cover_url: getBookCover(props.book.title, props.book.tags)
     }])
   
   if (error) {
@@ -208,28 +206,6 @@ const addToLibrary = async () => {
   }
   
   emit('addedToLibrary', props.book)
-}
-
-const getBookCover = (title) => {
-  if (!title) return 'https://images.unsplash.com/photo-1614728263952-84ea256f9679?w=800&q=80'
-  
-  if (title.includes('三体')) return 'https://lh3.googleusercontent.com/aida-public/AB6AXuAhhKEcvhIKMw4rHgOiyb0jWxuvGz77_P5Zmtk2Q86RzUBNKNxjtiwh1KF3Q0MSwk2VCHfn5A6uQMwcW4bvAA6M-E-rwY0IkGHVz2H-FqtmbMiYo3A_MMywWUSnMUVriLLVWAj1LRbsaPpUOP-Aemmc_BD-vQ71vS_fzGgDYLzYvw2owfr0ogONAuLNaHLgljWi9ecc7JoLVVLV4RtIiEVnZxPBpiWTp13tx8mqs8EfHGa3Us_6bCxzvAMAJN0333vkXNQ12JV8pes'
-  if (title.includes('基地')) return 'https://lh3.googleusercontent.com/aida-public/AB6AXuAvkknSicCX7BirXctdSa13xDUajM-3j-JzJ154X4jNA-_s7iFTCd9E73kix7sLxT12Fb93DYy9AwzEgQsCqO1pB7G7Vl1G7-jVMUnnsAxzmfxZVhoPL-z1G6T3_fLv4eqxEhEb2MpHvDTmOz33vEhiYhN0Z2c2JYxmqyu5V4pr4MFNw3chNxSZWTblf129NahdFJMK4HX-tttIleaS-cJnYVV4aNu1oYbIGSTdrar5K9QPrXbP0z5jOSvjkzXcj83Bcj4l95W0KvE'
-  if (title.includes('森林')) return 'https://lh3.googleusercontent.com/aida-public/AB6AXuAVHwMVif-kpG2Fnm6A_bu-FYJSkLvdifqEH-rnK6yERC3kPBcOv59FfBfzqU85KSA2Uh30hQsKhJ3zpybuaLLPkUKs0txXRiCNJTHVIGzpEXHowNleiK_odjlBWLBNr5kcPxOoBdJnvvinu1hMJ11-PMOW6nEyrFKWE0bGPpSDnoPFRSwEDWcfZ5us14p2xNhKIEs3G4mWvup58pakiFc09ZKRonmx18jPKb07yHRnvMgsWhBXwmPIFfZwAuB8kfsy1IVM7frXFxg'
-  
-  const covers = [
-    'https://images.unsplash.com/photo-1614728263952-84ea256f9679?w=800&q=80',
-    'https://images.unsplash.com/photo-1550399105-c4eb705e46ce?w=800&q=80',
-    'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=800&q=80',
-    'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=800&q=80'
-  ]
-  
-  let hash = 0
-  for (let i = 0; i < title.length; i++) {
-    hash = title.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  const index = Math.abs(hash) % covers.length
-  return covers[index]
 }
 </script>
 

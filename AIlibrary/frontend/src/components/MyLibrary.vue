@@ -91,11 +91,12 @@
         </div>
       </aside>
 
-      <main class="flex-1 md:ml-64 p-8 w-full max-w-[1200px] mx-auto transition-opacity duration-300">
+      <!-- 总览 Tab -->
+      <main v-if="sideNav === 'overview'" class="flex-1 md:ml-64 p-8 w-full max-w-[1200px] mx-auto transition-opacity duration-300">
         <header class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <h1 class="text-4xl font-black tracking-tight mb-2">我的书库</h1>
-            <p class="text-gray-500">欢迎回来，今日已深度阅读 45 分钟。</p>
+            <h1 class="text-4xl font-black tracking-tight mb-2">书库总览</h1>
+            <p class="text-gray-500">欢迎回来，书库共收录 {{ libraryBooks.length }} 本图书。</p>
           </div>
           <button @click="$emit('switchToSearch')" class="px-5 py-2.5 bg-white border border-gray-200 text-brand-night text-sm font-bold rounded-lg hover:border-gray-300 hover:bg-gray-50 transition-all flex items-center gap-2 self-start">
             <span class="material-symbols-outlined text-[18px]">arrow_back</span>
@@ -103,118 +104,197 @@
           </button>
         </header>
 
-        <div class="grid grid-cols-12 gap-6">
-          <section class="col-span-12 lg:col-span-8">
-            <div class="flex items-center justify-between mb-6">
-              <h2 class="text-xl font-bold flex items-center gap-2">
-                <span class="material-symbols-outlined text-brand-night">bookmark</span>
-                当前借阅
-              </h2>
-              <span @click="showAllLoans = true" class="text-sm font-medium text-gray-400 hover:text-brand-night cursor-pointer transition-colors">查看全部 <span class="material-symbols-outlined text-xs align-middle">chevron_right</span></span>
+        <!-- 统计卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+          <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 rounded-xl bg-brand-aurora_start/10 flex items-center justify-center">
+                <span class="material-symbols-outlined text-brand-aurora_start">menu_book</span>
+              </div>
+              <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">总藏书</span>
             </div>
-            
-            <div v-if="libraryBooks.length === 0" class="bg-white rounded-xl p-12 text-center">
-              <span class="material-symbols-outlined text-6xl text-gray-200 mb-4">menu_book</span>
-              <p class="text-gray-500 mb-4">您的书库还是空的</p>
-              <button @click="$emit('switchToSearch')" class="px-6 py-2 bg-brand-aurora_start text-white font-bold rounded-lg hover:bg-brand-aurora_end transition-all">
-                去发现书籍
-              </button>
+            <p class="text-4xl font-black">{{ libraryBooks.length }}</p>
+          </div>
+          <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+                <span class="material-symbols-outlined text-emerald-600">calendar_today</span>
+              </div>
+              <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">本月新增</span>
             </div>
-            
-            <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div v-for="book in libraryBooks.slice(0, 4)" :key="book.id" class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex gap-4 hover:shadow-md transition-shadow group relative overflow-hidden">
-                <div class="w-24 h-36 flex-shrink-0 bg-gray-200 rounded shadow-md overflow-hidden cursor-pointer">
-                  <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" :src="book.cover_url" />
+            <p class="text-4xl font-black">{{ recentMonthCount }}</p>
+          </div>
+          <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+                <span class="material-symbols-outlined text-amber-600">tag</span>
+              </div>
+              <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">最常标签</span>
+            </div>
+            <p class="text-2xl font-black">{{ topTag || '--' }}</p>
+          </div>
+        </div>
+
+        <!-- 最近加入 -->
+        <section class="mb-10">
+          <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+            <span class="material-symbols-outlined text-brand-night">schedule</span> 最近加入
+          </h2>
+          <div v-if="libraryBooks.length === 0" class="bg-white rounded-xl p-12 text-center">
+            <span class="material-symbols-outlined text-6xl text-gray-200 mb-4">menu_book</span>
+            <p class="text-gray-500 mb-4">您的书库还是空的</p>
+            <button @click="$emit('switchToSearch')" class="px-6 py-2 bg-brand-aurora_start text-white font-bold rounded-lg hover:bg-brand-aurora_end transition-all">去发现书籍</button>
+          </div>
+          <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div v-for="book in libraryBooks.slice(0, 3)" :key="book.id" class="bg-white p-4 rounded-xl border border-gray-100 flex gap-3 hover:shadow-md transition-shadow">
+              <div class="w-14 h-20 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
+                <img class="w-full h-full object-cover" :src="getBookCover(book.title, [])" />
+              </div>
+              <div class="flex flex-col justify-center min-w-0">
+                <h3 class="font-bold text-sm truncate">{{ book.title }}</h3>
+                <p class="text-xs text-gray-400">{{ book.author }}</p>
+                <span class="text-[10px] font-bold mt-1" :class="book.status === '在馆' ? 'text-emerald-600' : 'text-rose-600'">{{ book.status }}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 标签分布 -->
+        <section>
+          <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+            <span class="material-symbols-outlined text-brand-night">label</span> 标签分布
+          </h2>
+          <div class="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
+            <div v-if="tagEntries.length === 0" class="text-center py-8 text-gray-400">
+              <span class="material-symbols-outlined text-4xl mb-2">tag</span>
+              <p>加入书籍后这里会显示标签分布</p>
+            </div>
+            <div v-else class="space-y-4">
+              <div v-for="[tag, count] in tagEntries.slice(0, 5)" :key="tag" class="flex items-center gap-3">
+                <span class="text-sm font-bold w-16 text-right shrink-0">{{ tag }}</span>
+                <div class="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
+                  <div class="h-full bg-gradient-to-r from-brand-aurora_start to-brand-aurora_end rounded-full transition-all duration-700" :style="{ width: (count / tagMaxCount * 100) + '%' }"></div>
                 </div>
-                <div class="flex-1 flex flex-col">
-                  <h3 class="font-bold text-lg leading-tight mb-1 cursor-pointer hover:text-brand-aurora_start transition-colors">{{ book.title }}</h3>
-                  <p class="text-xs text-gray-500 mb-4">{{ book.author }}</p>
-                  <div class="mt-auto">
-                    <div class="flex justify-between text-[10px] font-bold mb-1">
-                      <span>{{ book.status }}</span>
-                    </div>
-                    <div class="mt-3 flex gap-2">
-                       <button class="flex-1 bg-brand-night text-white text-[10px] font-bold py-1.5 rounded hover:bg-black transition-colors">查看详情</button>
-                    </div>
+                <span class="text-xs font-bold text-gray-500 w-6">{{ count }}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- 书籍 Tab -->
+      <main v-if="sideNav === 'books'" class="flex-1 md:ml-64 p-8 w-full max-w-[1200px] mx-auto transition-opacity duration-300">
+        <header class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <h1 class="text-4xl font-black tracking-tight mb-2">我的书库</h1>
+            <p class="text-gray-500">共 {{ libraryBooks.length }} 本藏书</p>
+          </div>
+          <button @click="$emit('switchToSearch')" class="px-5 py-2.5 bg-white border border-gray-200 text-brand-night text-sm font-bold rounded-lg hover:border-gray-300 hover:bg-gray-50 transition-all flex items-center gap-2 self-start">
+            <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+            返回发现中心
+          </button>
+        </header>
+
+        <div v-if="libraryBooks.length === 0" class="bg-white rounded-xl p-12 text-center">
+          <span class="material-symbols-outlined text-6xl text-gray-200 mb-4">menu_book</span>
+          <p class="text-gray-500 mb-4">您的书库还是空的</p>
+          <button @click="$emit('switchToSearch')" class="px-6 py-2 bg-brand-aurora_start text-white font-bold rounded-lg hover:bg-brand-aurora_end transition-all">去发现书籍</button>
+        </div>
+
+        <div v-else class="space-y-4">
+          <div v-for="book in libraryBooks" :key="book.id" class="bg-white rounded-xl p-4 flex items-center gap-4 hover:bg-gray-50 transition-colors border border-gray-100">
+            <div class="w-16 h-24 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+              <img :src="getBookCover(book.title, [])" :alt="book.title" class="w-full h-full object-cover" />
+            </div>
+            <div class="flex-1">
+              <h3 class="font-bold text-lg">{{ book.title }}</h3>
+              <p class="text-sm text-gray-500">{{ book.author }}</p>
+              <div class="flex items-center gap-2 mt-2">
+                <span class="text-xs font-bold px-2 py-0.5 rounded" :class="book.status === '在馆' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">{{ book.status }}</span>
+                <span class="text-xs text-gray-400">索书号: {{ book.call_number || 'N/A' }}</span>
+              </div>
+            </div>
+            <div class="flex flex-col items-end gap-2">
+              <p class="text-xs text-gray-400">{{ new Date(book.created_at).toLocaleDateString('zh-CN') }}</p>
+              <div class="flex gap-2">
+                <button @click="openComments(book)" class="flex items-center gap-1 text-sm text-brand-aurora_start hover:text-brand-aurora_end transition-colors bg-white border border-brand-aurora_start/30 px-3 py-1.5 rounded-lg hover:bg-brand-aurora_start/5">
+                  <span class="material-symbols-outlined text-xs">comment</span>
+                  留言 ({{ getCommentCount(book.title) }})
+                </button>
+                <button @click="returnBook(book)" class="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-lg transition-colors">归还</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- 统计 Tab -->
+      <main v-if="sideNav === 'stats'" class="flex-1 md:ml-64 p-8 w-full max-w-[1200px] mx-auto transition-opacity duration-300">
+        <header class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <h1 class="text-4xl font-black tracking-tight mb-2">阅读统计</h1>
+            <p class="text-gray-500">基于您的书库数据分析</p>
+          </div>
+          <button @click="$emit('switchToSearch')" class="px-5 py-2.5 bg-white border border-gray-200 text-brand-night text-sm font-bold rounded-lg hover:border-gray-300 hover:bg-gray-50 transition-all flex items-center gap-2 self-start">
+            <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+            返回发现中心
+          </button>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <!-- 标签分布图 -->
+          <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h2 class="text-lg font-bold mb-6 flex items-center gap-2">
+              <span class="material-symbols-outlined text-brand-aurora_start">pie_chart</span> 标签分布
+            </h2>
+            <div v-if="tagEntries.length === 0" class="text-center py-12 text-gray-400">
+              <span class="material-symbols-outlined text-4xl mb-2">bar_chart</span>
+              <p>加入书籍后这里会显示统计图表</p>
+            </div>
+            <div v-else class="space-y-3">
+              <div v-for="[tag, count] in tagEntries.slice(0, 8)" :key="tag" class="flex items-center gap-3">
+                <span class="text-xs font-bold w-14 text-right shrink-0 text-gray-600">{{ tag }}</span>
+                <div class="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden">
+                  <div class="h-full bg-gradient-to-r from-[#8B5CF6] to-[#0D9488] rounded-full transition-all duration-700 flex items-center justify-end pr-2" :style="{ width: (count / tagMaxCount * 100) + '%' }">
+                    <span v-if="count / tagMaxCount > 0.3" class="text-[10px] font-bold text-white">{{ count }}</span>
                   </div>
+                </div>
+                <span v-if="count / tagMaxCount <= 0.3" class="text-xs font-bold text-gray-500">{{ count }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 时间线 -->
+          <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <h2 class="text-lg font-bold mb-6 flex items-center gap-2">
+              <span class="material-symbols-outlined text-brand-aurora_start">timeline</span> 加入时间线
+            </h2>
+            <div v-if="libraryBooks.length === 0" class="text-center py-12 text-gray-400">
+              <span class="material-symbols-outlined text-4xl mb-2">timeline</span>
+              <p>暂无数据</p>
+            </div>
+            <div v-else class="space-y-6 relative">
+              <div class="absolute left-4 top-0 bottom-0 w-px bg-gray-200"></div>
+              <div v-for="book in libraryBooks.slice(0, 6)" :key="book.id" class="flex gap-4 items-start relative">
+                <div class="w-8 h-8 rounded-full bg-brand-aurora_start/10 border-2 border-brand-aurora_start flex items-center justify-center shrink-0 z-10">
+                  <span class="material-symbols-outlined text-brand-aurora_start text-sm">menu_book</span>
+                </div>
+                <div class="flex-1 pb-2">
+                  <p class="font-bold text-sm">{{ book.title }}</p>
+                  <p class="text-xs text-gray-400">{{ book.author }} · {{ new Date(book.created_at).toLocaleDateString('zh-CN') }}</p>
                 </div>
               </div>
             </div>
-          </section>
+          </div>
+        </div>
+      </main>
 
-          <section class="col-span-12 lg:col-span-4">
-            <div class="flex items-center justify-between mb-6">
-              <h2 class="text-xl font-bold flex items-center gap-2">
-                <span class="material-symbols-outlined text-brand-night">favorite</span>
-                我的收藏
-              </h2>
-            </div>
-            <div class="space-y-4">
-              <div v-for="book in libraryBooks.slice(0, 2)" :key="book.id" @click="showNotification('打开《' + book.title + '》详情页')" class="bg-white p-4 rounded-xl border border-gray-100 flex items-center gap-4 group cursor-pointer hover:border-brand-aurora_start/40 hover:shadow-sm transition-all transform hover:-translate-y-0.5">
-                <div class="w-10 h-14 bg-gray-50 rounded flex-shrink-0 overflow-hidden shadow-sm">
-                  <img class="w-full h-full object-cover" :src="book.cover_url" />
-                </div>
-                <div>
-                  <h4 class="font-bold text-sm group-hover:text-brand-aurora_start transition-colors">{{ book.title }}</h4>
-                  <p class="text-[10px] text-gray-400">{{ book.author }}</p>
-                </div>
-                <span class="material-symbols-outlined ml-auto text-gray-300 group-hover:text-brand-aurora_start transition-colors">arrow_forward_ios</span>
-              </div>
-            </div>
-          </section>
-
-          <section class="col-span-12 mt-4">
-            <div class="aurora-border p-[1px] relative rounded-[0.8rem] overflow-hidden group">
-              <div class="absolute inset-0 bg-gradient-to-r from-[#8B5CF6] to-[#0D9488] opacity-100 group-hover:opacity-100 blur-[2px] transition-opacity duration-1000 -z-10"></div>
-              
-              <div class="bg-white rounded-[0.75rem] p-8 relative z-10 m-[1px]">
-                <div class="flex items-center justify-between mb-8">
-                  <div class="flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-full bg-gradient-to-br from-brand-aurora_start to-brand-aurora_end flex items-center justify-center text-white shadow-md shadow-brand-aurora_start/20">
-                      <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">psychology</span>
-                    </div>
-                    <div>
-                      <h2 class="text-2xl font-black tracking-tight">AI 学习路径</h2>
-                      <p class="text-sm text-gray-500">基于您的阅读历史的深度进阶建议</p>
-                    </div>
-                  </div>
-                  <button @click="showNotification('编辑学习路径设定')" class="text-gray-400 hover:text-brand-night bg-gray-50 hover:bg-gray-100 p-2 rounded-full transition-colors flex items-center gap-2 text-xs font-bold px-4"><span class="material-symbols-outlined text-[16px]">tune</span> 定制</button>
-                </div>
-                
-                <div class="relative">
-                  <div class="absolute left-6 top-0 bottom-0 w-px bg-gradient-to-b from-brand-aurora_start via-brand-aurora_end to-transparent"></div>
-                  
-                  <div class="space-y-12 relative">
-                    <div class="flex gap-12 items-start group/milestone cursor-pointer" @click="showNotification('回顾：认知革命的学习笔记')">
-                      <div class="z-10 w-12 h-12 rounded-full bg-brand-aurora_start/10 border-2 border-brand-aurora_start flex items-center justify-center shadow-sm transition-transform group-hover/milestone:scale-110">
-                        <span class="material-symbols-outlined text-brand-aurora_start" style="font-variation-settings: 'FILL' 1;">check_circle</span>
-                      </div>
-                      <div class="flex-1 bg-transparent group-hover/milestone:bg-brand-aurora_start/5 -my-4 p-4 rounded-xl transition-colors">
-                        <div class="flex items-center gap-3 mb-2">
-                          <span class="px-2 py-0.5 rounded bg-brand-aurora_start/10 text-brand-aurora_start text-[10px] font-black uppercase tracking-widest">已掌握</span>
-                          <h3 class="font-bold text-lg group-hover/milestone:text-brand-aurora_start transition-colors">认知革命：从生物学到历史学</h3>
-                        </div>
-                        <p class="text-sm text-gray-600 max-w-2xl">探索虚构故事如何让数万智人进行灵活合作。结合此前阅读的《枪炮、病菌与钢铁》的前三章。</p>
-                      </div>
-                    </div>
-
-                    <div class="flex gap-12 items-start group/milestone opacity-50 hover:opacity-80 transition-opacity cursor-not-allowed">
-                      <div class="z-10 w-12 h-12 rounded-full bg-gray-50 border-2 border-gray-200 flex items-center justify-center shadow-sm">
-                        <span class="material-symbols-outlined text-gray-400">lock</span>
-                      </div>
-                      <div class="flex-1">
-                        <div class="flex items-center gap-3 mb-2">
-                          <span class="px-2 py-0.5 rounded bg-gray-100 text-gray-400 text-[10px] font-black uppercase tracking-widest">待解锁</span>
-                          <h3 class="font-bold text-lg">完成更多阅读解锁</h3>
-                        </div>
-                        <p class="text-sm text-gray-600 max-w-2xl">继续在发现页搜索和借阅书籍，解锁更多个性化学习路径。</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
+      <!-- AI助手 / 设置 占位 -->
+      <main v-if="sideNav === 'ai' || sideNav === 'settings'" class="flex-1 md:ml-64 p-8 w-full max-w-[1200px] mx-auto transition-opacity duration-300">
+        <div class="bg-white rounded-2xl p-16 text-center border border-gray-100">
+          <span class="material-symbols-outlined text-7xl text-gray-200 mb-6">{{ sideNav === 'ai' ? 'psychology' : 'settings' }}</span>
+          <h2 class="text-2xl font-black mb-2">{{ sideNav === 'ai' ? 'AI 助手' : '设置' }}</h2>
+          <p class="text-gray-500">功能开发中，敬请期待</p>
         </div>
       </main>
     </div>
@@ -356,8 +436,9 @@
 </template>
 
 <script setup>
-import { ref, defineEmits, onMounted, watch } from 'vue'
+import { ref, computed, defineEmits, onMounted, watch } from 'vue'
 import { supabase } from '../supabase.js'
+import { getBookCover } from '../coverUtils.js'
 
 const props = defineProps({
   currentUser: {
@@ -369,7 +450,7 @@ const props = defineProps({
 const emit = defineEmits(['switchToSearch'])
 
 const topNav = ref('library')
-const sideNav = ref('books')
+const sideNav = ref('overview')
 const searchQuery = ref('')
 const showToast = ref(false)
 const toastMessage = ref('')
@@ -381,6 +462,50 @@ const currentBook = ref(null)
 const newCommentName = ref('')
 const newCommentContent = ref('')
 const newCommentRating = ref(5)
+
+// 总览 & 统计 Tab 计算属性
+const recentMonthCount = computed(() => {
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  return libraryBooks.value.filter(b => new Date(b.created_at) >= monthStart).length
+})
+
+const tagEntries = computed(() => {
+  const counts = {}
+  // 从 book_comments 或 tags 聚合标签（简化：从书名推断或默认）
+  // 实际标签数据存储在雷达的 libraryTagCounts 中，这里从 localStorage 读取
+  try {
+    // 从 localStorage 读取上次从 App.vue 传来的标签计数
+    // 由于跨组件通信，这里用简单的静态聚合
+  } catch {}
+  // 暂时用固定标签展示（后续可扩展）
+  if (libraryBooks.value.length === 0) return []
+  // 简单聚合：从书名关键词推断
+  const tagMap = {}
+  for (const book of libraryBooks.value) {
+    const title = book.title || ''
+    const author = book.author || ''
+    if (title.includes('三体') || title.includes('科幻')) tagMap['科幻'] = (tagMap['科幻'] || 0) + 1
+    else if (title.includes('Python') || title.includes('编程') || title.includes('代码')) tagMap['编程'] = (tagMap['编程'] || 0) + 1
+    else if (title.includes('经济') || title.includes('商业')) tagMap['经济'] = (tagMap['经济'] || 0) + 1
+    else if (title.includes('心理') || title.includes('焦虑')) tagMap['心理'] = (tagMap['心理'] || 0) + 1
+    else if (title.includes('文学') || title.includes('小说') || title.includes('百年孤独') || title.includes('活着')) tagMap['文学'] = (tagMap['文学'] || 0) + 1
+    else if (title.includes('历史') || title.includes('文明')) tagMap['历史'] = (tagMap['历史'] || 0) + 1
+    else if (title.includes('哲学') || title.includes('思想')) tagMap['哲学'] = (tagMap['哲学'] || 0) + 1
+    else tagMap['其他'] = (tagMap['其他'] || 0) + 1
+  }
+  return Object.entries(tagMap).sort((a, b) => b[1] - a[1])
+})
+
+const tagMaxCount = computed(() => {
+  const entries = tagEntries.value
+  return entries.length > 0 ? entries[0][1] : 1
+})
+
+const topTag = computed(() => {
+  const entries = tagEntries.value
+  return entries.length > 0 ? entries[0][0] : ''
+})
 
 const fetchLibraryBooks = async () => {
   if (!props.currentUser) {

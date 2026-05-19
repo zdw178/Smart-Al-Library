@@ -208,11 +208,18 @@ const emit = defineEmits(['switchToSearch'])
 const metrics = ref({
   todaySearches: 0,
   searchGrowth: 12.5,
-  conversionRate: 32.8,
+  conversionRate: 0,
   conversionGrowth: 3.2,
-  accuracyRate: 94.5,
+  accuracyRate: 0,
   accuracyGrowth: 1.8
 })
+
+const computeRealMetrics = () => {
+  const total = parseInt(localStorage.getItem('smartlib_search_count') || '0')
+  const converted = parseInt(localStorage.getItem('smartlib_converted_count') || '0')
+  metrics.value.accuracyRate = total > 0 ? Math.round((converted / total) * 100) : 0
+  metrics.value.conversionRate = total > 0 ? Math.round((converted / total) * 100) : 0
+}
 
 const fetchTodaySearches = async () => {
   const today = new Date()
@@ -331,6 +338,7 @@ const logs = ref([
 
 onMounted(() => {
   fetchTodaySearches()
+  computeRealMetrics()
   setInterval(fetchTodaySearches, 30000)
 })
 </script>

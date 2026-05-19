@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
+import asyncio
 import json
 import os
 import re
@@ -81,6 +82,116 @@ def rewrite_query_with_llm(query: str) -> str:
         print(f"DeepSeek 重写查询失败: {e}")
     
     return query
+
+def search_real_books_with_deepseek(query: str) -> list:
+    """使用 DeepSeek 的知识库搜索真实存在的图书，返回结构化数据"""
+    api_key = os.getenv("DEEPSEEK_API_KEY", "")
+    if not api_key:
+        print("[DeepSeek Search] No API key found")
+        return []
+
+    try:
+        response = deepseek_client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """你是一个专业的图书搜索助手。根据用户的搜索查询，从你的知识库中推荐最相关的真实存在的图书。
+
+你必须以严格的JSON格式返回，结构如下：
+{
+    "books": [
+        {
+            "title": "真实存在的书名",
+            "author": "真实作者名",
+            "description": "真实内容简介（80-150字）",
+            "rating": "豆瓣评分（如8.5，若不确定填''）",
+            "tags": ["标签1", "标签2", "标签3"],
+            "isbn": "ISBN号（如不确定填''）"
+        }
+    ]
+}
+
+要求：
+1. 只返回真实存在的图书，严禁编造
+2. 返回3-5本最相关的图书
+3. 描述要准确反映图书内容
+4. 标签要与图书主题相关
+5. 只返回JSON，不要其他任何文字"""
+                },
+                {
+                    "role": "user",
+                    "content": f"请搜索与以下查询最相关的真实图书：{query}"
+                }
+            ],
+            temperature=0.3,
+            max_tokens=1500,
+            response_format={"type": "json_object"}
+        )
+
+        content = response.choices[0].message.content.strip()
+        content = clean_json_string(content)
+        result = json.loads(content)
+        books = result.get("books", [])
+
+        # 为每本书补充 BookCard 渲染所需的字段
+        for i, book in enumerate(books):
+            book.setdefault("isbn", "")
+            book.setdefault("call_number", f"I{book.get('author', '')[:2]}/{i+1}")
+            book.setdefault("status", "在馆")
+            book.setdefault("emotion", book.get("tags", ["推荐"])[0] if book.get("tags") else "推荐")
+            book.setdefault("scenario", "")
+            book.setdefault("similarity_score", 1.0)
+            book.setdefault("similar_books", [])
+            book["source"] = "deepseek"
+
+        # 为真实图书之间建立相似推荐关系
+        for i, book in enumerate(books):
+            if not book.get("similar_books"):
+                sims = []
+                for j, other in enumerate(books):
+                    if i != j:
+                        sims.append({
+                            "title": other.get("title", ""),
+                            "rating": other.get("rating", ""),
+                            "emotion": other.get("emotion", "")
+                        })
+                book["similar_books"] = sims[:2]
+
+        print(f"[DeepSeek Search] 查询: {query} -> 找到 {len(books)} 本真实图书")
+        for b in books:
+            print(f"  - 《{b.get('title', '')}》 {b.get('author', '')} (评分: {b.get('rating', 'N/A')})")
+        return books
+
+    except json.JSONDecodeError as e:
+        print(f"[DeepSeek Search] JSON解析失败: {e}")
+        print(f"[DeepSeek Search] Raw content: {content}")
+        return []
+    except Exception as e:
+        print(f"[DeepSeek Search] 搜索失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
+def merge_book_results(real_books: list, mock_books: list, max_results: int = 5) -> list:
+    """合并真实图书和模拟数据，去重，真实结果优先"""
+    merged = []
+    seen_titles = set()
+
+    for book in real_books:
+        title_key = book.get("title", "").strip().lower()
+        if title_key and title_key not in seen_titles:
+            seen_titles.add(title_key)
+            merged.append(book)
+
+    for book in mock_books:
+        title_key = book.get("title", "").strip().lower()
+        if title_key and title_key not in seen_titles:
+            seen_titles.add(title_key)
+            merged.append(book)
+
+    print(f"[Merge] 真实图书: {len(real_books)}本, Mock: {len(mock_books)}本, 合并后: {len(merged)}本")
+    return merged[:max_results]
 
 def get_similar_books(book_idx, top_k=2):
     book_vec = tfidf_matrix[book_idx]
@@ -250,6 +361,12 @@ def read_root():
 def health_check():
     return {"status": "healthy", "books_count": len(local_books)}
 
+@app.get("/api/discovery")
+def discovery():
+    """快速发现端点 - 不调用任何 LLM，直接返回高分书籍"""
+    sorted_books = sorted(local_books, key=lambda b: float(b.get('rating', 0)), reverse=True)
+    return {"results": sorted_books[:3], "count": 3}
+
 @app.get("/api/search/exact")
 def exact_search(query: str = Query(..., description="搜索关键词")):
     results = []
@@ -260,54 +377,59 @@ def exact_search(query: str = Query(..., description="搜索关键词")):
     return {"results": results, "count": len(results)}
 
 @app.get("/api/search/smart")
-def smart_search(query: str = Query(..., description="自然语言搜索关键词")):
+async def smart_search(query: str = Query(..., description="自然语言搜索关键词")):
     print(f"\n[Smart Search] =======================================")
     print(f"[Smart Search] Received query: {query}")
-    
-    rewritten_query = rewrite_query_with_llm(query)
+
+    # Step 1: 并行 — 查询改写 + DeepSeek 真实图书搜索
+    print("[Smart Search] Step 1: Query rewrite + Real book search (parallel)")
+    rewritten_query, real_books = await asyncio.gather(
+        asyncio.to_thread(rewrite_query_with_llm, query),
+        asyncio.to_thread(search_real_books_with_deepseek, query)
+    )
     print(f"[Smart Search] Rewritten query: {rewritten_query}")
-    
-    print("[Smart Search] Step 2: Vectorizing query with Jieba")
+    print(f"[Smart Search] Real books found: {len(real_books)}")
+
+    # Step 2: TF-IDF Mock数据搜索（兜底 + 补充）
+    print("[Smart Search] Step 2: TF-IDF mock data search")
     query_vec = vectorizer.transform([rewritten_query])
-    
-    print("[Smart Search] Step 3: Calculating cosine similarity")
     sims = cosine_similarity(query_vec, tfidf_matrix).flatten()
-    print(f"[Smart Search] Similarity scores: {sims}")
-    
     top_indices = np.argsort(sims)[::-1][:4]
-    print(f"[Smart Search] Top indices: {top_indices}")
-    
-    results = []
+
+    mock_results = []
     for idx in top_indices:
         book_obj = dict(local_books[idx])
         book_obj["similar_books"] = get_similar_books(idx, top_k=2)
         book_obj["similarity_score"] = float(sims[idx])
-        results.append(book_obj)
-        print(f"[Search Debug] Match: {book_obj['title']} (Score: {sims[idx]:.4f})")
-            
-    if not results:
-        print("[Smart Search] No results found, using default recommendations")
-        results = [dict(local_books[0]), dict(local_books[1]), dict(local_books[2])]
-        for r in results:
-            idx = local_books.index(next(b for b in local_books if b["isbn"] == r["isbn"]))
-            r["similar_books"] = get_similar_books(idx, top_k=2)
+        book_obj["source"] = "mock"
+        mock_results.append(book_obj)
 
-    print("\n[Smart Search] === Top-3 本地检索结果 ===")
-    for i, book in enumerate(results[:3], 1):
-        print(f"  {i}. 《{book['title']}》 - 作者: {book['author']} (相似度: {book.get('similarity_score', 'N/A'):.4f})")
-    print("[Smart Search] =============================\n")
-    
-    print("[Smart Search] Step 5: Generating recommendation with DeepSeek")
-    deepseek_result = generate_recommendation_with_deepseek(rewritten_query, results[:3])
-    
-    print("[Smart Search] Step 6: Performing web search with Gemini")
-    web_search_result = gemini_web_search(rewritten_query)
-    print(f"[Smart Search] Web search result length: {len(web_search_result)}")
+    # Step 3: 合并结果 — 真实图书优先
+    merged_results = merge_book_results(real_books, mock_results)
 
-    print("[Smart Search] Step 7: Returning response")
+    if not merged_results:
+        print("[Smart Search] No results, using mock defaults")
+        merged_results = [dict(local_books[0]), dict(local_books[1]), dict(local_books[2])]
+        for r in merged_results:
+            r["source"] = "mock"
+            r.setdefault("similar_books", [])
+            r.setdefault("similarity_score", 0.0)
+
+    print("\n[Smart Search] === Final Results ===")
+    for i, book in enumerate(merged_results, 1):
+        print(f"  {i}. 《{book.get('title', '')}》 {book.get('author', '')} (来源: {book.get('source', '')})")
+    print("[Smart Search] ======================\n")
+
+    # Step 4: 并行 — 推荐生成 + Gemini 联网搜索
+    print("[Smart Search] Step 4: Recommendation + Gemini search (parallel)")
+    deepseek_result, web_search_result = await asyncio.gather(
+        asyncio.to_thread(generate_recommendation_with_deepseek, rewritten_query, merged_results[:3]),
+        asyncio.to_thread(gemini_web_search, rewritten_query)
+    )
+
     return {
-        "results": results[:3],
-        "count": min(len(results), 3),
+        "results": merged_results[:3],
+        "count": len(merged_results[:3]),
         "rewritten_query": rewritten_query,
         "web_search": web_search_result,
         "recommendation": deepseek_result.get("recommendation", f"系统基于您查询的「{rewritten_query}」，为您匹配了以下书籍。"),

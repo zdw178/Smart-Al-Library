@@ -141,24 +141,43 @@
             <div class="card p-8 flex flex-col gap-6">
               <div class="flex flex-col gap-1">
                 <h5 class="font-headline font-extrabold text-lg flex items-center gap-2">
-                  <span class="material-symbols-outlined text-accent-teal font-light">radar</span> 
+                  <span class="material-symbols-outlined text-accent-teal font-light">radar</span>
                   馆员洞察
                 </h5>
-                <p class="text-[10px] text-on-surface-muted uppercase tracking-widest font-bold">阅读偏好雷达</p>
+                <p class="text-[10px] text-on-surface-muted uppercase tracking-widest font-bold">索书偏好雷达</p>
               </div>
-              <div class="relative w-full aspect-square flex items-center justify-center p-4">
-                <div class="absolute inset-0 spider-chart opacity-60 mix-blend-multiply"></div>
-                <div class="absolute inset-4 border border-outline-subtle/80 rounded-full border-dashed"></div>
-                <div class="absolute inset-16 border border-outline-subtle/80 rounded-full border-dashed"></div>
-                <span class="absolute top-0 text-[10px] font-extrabold uppercase tracking-widest text-on-surface-muted">硬核科学</span>
-                <span class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 text-[10px] font-extrabold uppercase tracking-widest rotate-90 text-on-surface-muted">社会学</span>
-                <span class="absolute bottom-0 text-[10px] font-extrabold uppercase tracking-widest text-on-surface-muted">文学小说</span>
-                <span class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 text-[10px] font-extrabold uppercase tracking-widest -rotate-90 text-on-surface-muted">焦虑缓解</span>
+              <div class="relative w-full aspect-square flex items-center justify-center">
+                <svg viewBox="0 0 200 200" class="w-full h-full">
+                  <!-- 同心参考圆 -->
+                  <circle cx="100" cy="100" r="58" fill="none" stroke="currentColor" stroke-opacity="0.1" stroke-width="1" stroke-dasharray="3,4"/>
+                  <circle cx="100" cy="100" r="43.5" fill="none" stroke="currentColor" stroke-opacity="0.08" stroke-width="1" stroke-dasharray="3,4"/>
+                  <circle cx="100" cy="100" r="29" fill="none" stroke="currentColor" stroke-opacity="0.08" stroke-width="1" stroke-dasharray="3,4"/>
+                  <circle cx="100" cy="100" r="14.5" fill="none" stroke="currentColor" stroke-opacity="0.06" stroke-width="1" stroke-dasharray="3,4"/>
+                  <!-- 轴线 -->
+                  <line v-for="(label, i) in radarAxes" :key="'axis-'+i"
+                    :x1="100" :y1="100"
+                    :x2="100 + 58 * Math.sin(i * Math.PI / 2)"
+                    :y2="100 - 58 * Math.cos(i * Math.PI / 2)"
+                    stroke="currentColor" stroke-opacity="0.12" stroke-width="1"/>
+                  <!-- 数据多边形 -->
+                  <polygon :points="radarPoints"
+                    fill="rgba(13,148,136,0.15)" stroke="#0D9488" stroke-width="1.5" stroke-linejoin="round"/>
+                  <!-- 数据点 -->
+                  <circle v-for="(axis, i) in radarAxes" :key="'dot-'+i"
+                    :cx="100 + 58 * axis.value * Math.sin(i * Math.PI / 2)"
+                    :cy="100 - 58 * axis.value * Math.cos(i * Math.PI / 2)"
+                    r="3" fill="#0D9488"/>
+                  <!-- 轴标签 -->
+                  <text v-for="(label, i) in radarLabels" :key="'label-'+i"
+                    :x="label.x" :y="label.y"
+                    text-anchor="middle" dominant-baseline="central"
+                    class="text-[10px] font-extrabold uppercase tracking-widest"
+                    fill="currentColor" fill-opacity="0.45"
+                    style="font-family: inherit;">{{ label.label }}</text>
+                </svg>
               </div>
               <div class="flex flex-col gap-3">
-                <p class="text-sm text-on-surface-muted leading-relaxed font-medium">
-                  您的关注点正转向 <span class="text-on-surface font-bold border-b-2 border-accent/30 pb-0.5">社会学小说</span>。我们已调整您的每日简报，加入更多系统性分析内容。
-                </p>
+                <p class="text-sm text-on-surface-muted leading-relaxed font-medium" v-html="radarInsight"></p>
               </div>
             </div>
 
@@ -240,7 +259,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import BookCard from './components/BookCard.vue'
 import Dashboard from './components/Dashboard.vue'
 import MyLibrary from './components/MyLibrary.vue'
@@ -258,6 +277,93 @@ const recommendation = ref('')
 const webSearchResult = ref('')
 const showToast = ref(false)
 const toastMessage = ref('')
+const libraryTagCounts = ref({})
+
+// 雷达图数据：Top 4 标签 + 归一化数值
+const radarAxes = computed(() => {
+  const entries = Object.entries(libraryTagCounts.value)
+  if (entries.length === 0) {
+    return [
+      { label: '科幻', value: 0 },
+      { label: '文学', value: 0 },
+      { label: '历史', value: 0 },
+      { label: '哲学', value: 0 }
+    ]
+  }
+  entries.sort((a, b) => b[1] - a[1])
+  const top4 = entries.slice(0, 4)
+  const maxCount = top4[0]?.[1] || 1
+  return top4.map(([tag, count]) => ({ label: tag, value: count / maxCount }))
+})
+
+// SVG 雷达多边形点
+const radarPoints = computed(() => {
+  return radarAxes.value.map((axis, i) => {
+    const angle = (i * Math.PI) / 2
+    const r = 58 * axis.value
+    const x = 100 + r * Math.sin(angle)
+    const y = 100 - r * Math.cos(angle)
+    return `${x},${y}`
+  }).join(' ')
+})
+
+// 雷达轴标签位置
+const radarLabels = computed(() => {
+  return radarAxes.value.map((axis, i) => {
+    const angle = (i * Math.PI) / 2
+    const r = 78
+    const x = 100 + r * Math.sin(angle)
+    const y = 100 - r * Math.cos(angle)
+    return { ...axis, x, y }
+  })
+})
+
+// 洞察文字
+const radarInsight = computed(() => {
+  if (radarAxes.value.every(a => a.value === 0)) {
+    return '添加图书到书库后，我们会根据您的偏好生成个性化洞察。'
+  }
+  const top = radarAxes.value[0]
+  return `您的关注点正转向 <span class="text-on-surface font-bold border-b-2 border-accent/30 pb-0.5">${top.label}</span>。我们已调整您的书库简报，加入更多相关内容。`
+})
+
+// 从标签中提取并统计
+const collectTags = (tags) => {
+  if (!tags || !Array.isArray(tags)) return
+  const counts = { ...libraryTagCounts.value }
+  for (const tag of tags) {
+    counts[tag] = (counts[tag] || 0) + 1
+  }
+  libraryTagCounts.value = counts
+}
+
+// 从 Supabase 加载书库中的标签
+const loadLibraryTags = async () => {
+  if (!currentUser.value) return
+  try {
+    const { data, error } = await supabase
+      .from('library_books')
+      .select('title, author')
+      .eq('user_id', String(currentUser.value.id))
+    if (error || !data) return
+
+    // 用书名在 mock_data 中查找标签（前端无法直接访问后端数据）
+    // 主要通过 handleAddedToLibrary 实时累积
+    const counts = {}
+    for (const book of data) {
+      // 尝试从搜索结果中已有的 books 匹配标签
+      const matched = books.value.find(b => b.title === book.title)
+      if (matched && matched.tags) {
+        for (const tag of matched.tags) {
+          counts[tag] = (counts[tag] || 0) + 1
+        }
+      }
+    }
+    if (Object.keys(counts).length > 0) {
+      libraryTagCounts.value = { ...libraryTagCounts.value, ...counts }
+    }
+  } catch {}
+}
 
 const handleLoginSuccess = (user) => {
   currentUser.value = user
@@ -282,6 +388,9 @@ const handleLogout = () => {
 }
 
 const handleAddedToLibrary = (book) => {
+  collectTags(book.tags)
+  const converted = parseInt(localStorage.getItem('smartlib_converted_count') || '0') + 1
+  localStorage.setItem('smartlib_converted_count', converted)
   toastMessage.value = '已成功加入书库：' + book.title
   toastType.value = 'success'
   showToast.value = true
@@ -301,8 +410,18 @@ const handleShowToast = (toast) => {
   }, 3000)
 }
 
+const fetchWithTimeout = (url, timeoutMs = 12000) => {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer))
+}
+
 const performSearch = async () => {
   if (!searchQuery.value.trim()) return
+
+  // 追踪搜索指标
+  const count = parseInt(localStorage.getItem('smartlib_search_count') || '0') + 1
+  localStorage.setItem('smartlib_search_count', count)
 
   loading.value = true
   error.value = ''
@@ -317,7 +436,7 @@ const performSearch = async () => {
     
     try {
       const apiBase = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8001'
-      const response = await fetch(apiBase + endpoint + '?query=' + encodeURIComponent(searchQuery.value))
+      const response = await fetchWithTimeout(apiBase + endpoint + '?query=' + encodeURIComponent(searchQuery.value), 15000)
       if (!response.ok) {
         throw new Error('Search failed')
       }
@@ -326,10 +445,15 @@ const performSearch = async () => {
       console.log("[Search Success] Web search result:", data.web_search)
       books.value = data.results || []
       
-      await supabase
-        .from('ai_search_sessions')
-        .insert([{ search_query: searchQuery.value }])
-      
+      try {
+        const { error: sbError } = await supabase
+          .from('ai_search_sessions')
+          .insert([{ search_query: searchQuery.value }])
+        if (sbError) console.error('[Supabase] 写入失败:', sbError.message, sbError.details)
+      } catch (sbErr) {
+        console.error('[Supabase] 连接异常:', sbErr.message || sbErr)
+      }
+
       if (searchMode.value === 'smart') {
         if (data.recommendation) {
           recommendation.value = data.recommendation
@@ -341,30 +465,33 @@ const performSearch = async () => {
       loading.value = false
     } catch (e) {
       console.warn("[Search Warning] Backend fetch failed, falling back to mock data.", e)
-      await supabase
-        .from('ai_search_sessions')
-        .insert([{ search_query: searchQuery.value }])
-      // 模拟数据回退（用于美观演示）
-      setTimeout(() => {
-        let mockBooks = [
-          { title: "三体", author: "刘慈欣", description: "一部硬科幻杰作，深刻质疑了人类在充满敌意的宇宙中的地位。鉴于您最近对时空物理学的关注，此书为您首选匹配。", call_number: "I247.5", status: "在馆", rating: "9.4" },
-          { title: "基地", author: "艾萨克·阿西莫夫", description: "破解历史周期的数学密码，建立拯救文明的庞大史诗。", call_number: "I712.4", status: "在馆", rating: "9.1" },
-          { title: "挪威的森林", author: "村上春树", description: "一场关于丧失与青春晚期乡愁的诗意旅程。", call_number: "I313.4", status: "借出", rating: "8.9" },
-        ]
-        
-        if(searchQuery.value.includes('现代孤独感')) {
-          mockBooks = [mockBooks[2], mockBooks[0]]
-          recommendation.value = '基于您对「现代孤独感」的探索，为您推荐探讨个体在庞大宇宙与社会结构中寻找存在意义的作品。'
-        } else if (searchQuery.value.includes('硬科幻')) {
-          mockBooks = [mockBooks[0], mockBooks[1]]
-          recommendation.value = '从您的复杂查询中，我们提取了物理学硬核推演与社会哲学的交叉维度，为您优先推荐这两部经典。'
-        } else {
-          recommendation.value = '这是一份基于您意图的智能分析结果（模拟演示模式）。探索这些跨越时空的知识节点吧。'
-        }
-        
-        books.value = mockBooks
-        loading.value = false
-      }, 1200)
+      try {
+        const { error: sbError } = await supabase
+          .from('ai_search_sessions')
+          .insert([{ search_query: searchQuery.value }])
+        if (sbError) console.error('[Supabase] 写入失败:', sbError.message, sbError.details)
+      } catch (sbErr) {
+        console.error('[Supabase] 连接异常:', sbErr.message || sbErr)
+      }
+      // 模拟数据回退（后端不可用时立即展示）
+      let mockBooks = [
+        { title: "三体", author: "刘慈欣", description: "一部硬科幻杰作，深刻质疑了人类在充满敌意的宇宙中的地位。鉴于您最近对时空物理学的关注，此书为您首选匹配。", call_number: "I247.5", status: "在馆", rating: "9.4" },
+        { title: "基地", author: "艾萨克·阿西莫夫", description: "破解历史周期的数学密码，建立拯救文明的庞大史诗。", call_number: "I712.4", status: "在馆", rating: "9.1" },
+        { title: "挪威的森林", author: "村上春树", description: "一场关于丧失与青春晚期乡愁的诗意旅程。", call_number: "I313.4", status: "借出", rating: "8.9" },
+      ]
+
+      if(searchQuery.value.includes('现代孤独感')) {
+        mockBooks = [mockBooks[2], mockBooks[0]]
+        recommendation.value = '基于您对「现代孤独感」的探索，为您推荐探讨个体在庞大宇宙与社会结构中寻找存在意义的作品。'
+      } else if (searchQuery.value.includes('硬科幻')) {
+        mockBooks = [mockBooks[0], mockBooks[1]]
+        recommendation.value = '从您的复杂查询中，我们提取了物理学硬核推演与社会哲学的交叉维度，为您优先推荐这两部经典。'
+      } else {
+        recommendation.value = '这是一份基于您意图的智能分析结果（模拟演示模式）。探索这些跨越时空的知识节点吧。'
+      }
+
+      books.value = mockBooks
+      loading.value = false
     }
   } catch (err) {
     error.value = "网络异常或服务未启动，无法获取真实数据。"
@@ -374,28 +501,46 @@ const performSearch = async () => {
 
 const loadDiscoveryBooks = async () => {
   loading.value = true
+  const cacheKey = 'discovery_books_cache'
+
+  // 1. 优先展示缓存，实现秒开
+  const cached = localStorage.getItem(cacheKey)
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached)
+      if (parsed.length > 0) {
+        books.value = parsed
+        loading.value = false
+      }
+    } catch {}
+  }
+
+  // 2. 后台请求快速发现端点（不经过 LLM，秒级响应）
   try {
     const apiBase = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8001'
-    const response = await fetch(apiBase + '/api/search/smart?query=' + encodeURIComponent('经典必读必看的好书，发人深省'))
+    const response = await fetchWithTimeout(apiBase + '/api/discovery', 8000)
     if (response.ok) {
       const data = await response.json()
       if (data.results && data.results.length > 0) {
         books.value = data.results
+        localStorage.setItem(cacheKey, JSON.stringify(data.results))
         loading.value = false
         return
       }
     }
-  } catch(e) {}
-  
-  // 模拟数据回退（用于初始探索页面美观演示）
-  setTimeout(() => {
+  } catch(e) {
+    console.warn('[Discovery] Backend fetch failed:', e.message || e)
+  }
+
+  // 3. 后端不可用且无缓存时，立即展示模拟数据
+  if (books.value.length === 0) {
     books.value = [
       { title: "三体", author: "刘慈欣", description: "一部硬科幻杰作，深刻质疑了人类在充满敌意的宇宙中的地位。鉴于您最近对时空物理学的关注，此书为您首选匹配。", call_number: "I247.5", status: "在馆", rating: "9.4" },
       { title: "基地", author: "艾萨克·阿西莫夫", description: "破解历史周期的数学密码，建立拯救文明的庞大史诗。", call_number: "I712.4", status: "在馆", rating: "9.1" },
       { title: "挪威的森林", author: "村上春树", description: "一场关于丧失与青春晚期乡愁的诗意旅程。", call_number: "I313.4", status: "借出", rating: "8.9" },
     ]
-    loading.value = false
-  }, 500)
+  }
+  loading.value = false
 }
 
 // 组件加载时检查用户登录状态
@@ -405,6 +550,7 @@ onMounted(() => {
     currentUser.value = JSON.parse(savedUser)
   }
   loadDiscoveryBooks()
+  loadLibraryTags()
 })
 </script>
 
