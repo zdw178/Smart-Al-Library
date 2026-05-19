@@ -437,10 +437,30 @@ async def smart_search(query: str = Query(..., description="自然语言搜索�
         "tags": deepseek_result.get("tags", [])
     }
 
+print(f"[Startup] CWD: {os.getcwd()}")
+print(f"[Startup] __file__: {__file__}")
+print(f"[Startup] Books loaded: {len(local_books)}")
+print(f"[Startup] DeepSeek API Key: {'configured' if os.getenv('DEEPSEEK_API_KEY') else 'MISSING'}")
+
 # 托管前端静态文件（生产环境用）
+# __file__ 是 main.py 的绝对路径，所以相对路径基于 backend/ 目录
 frontend_dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+frontend_dist = os.path.abspath(frontend_dist)
+print(f"[Startup] Frontend dist path: {frontend_dist}")
+print(f"[Startup] Dist exists: {os.path.exists(frontend_dist)}")
 if os.path.exists(frontend_dist):
-    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
+    try:
+        app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
+        print("[Startup] Frontend static files mounted successfully")
+    except Exception as e:
+        print(f"[Startup] Failed to mount frontend: {e}")
+else:
+    print("[Startup] WARNING: frontend/dist not found, only API routes available")
+    # 确保 API 路由不被影响
+    @app.get("/")
+    def root_fallback():
+        return {"message": "SmartLib API is running. Frontend not deployed."}
+
 
 if __name__ == "__main__":
     import uvicorn
