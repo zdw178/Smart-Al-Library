@@ -5,5 +5,4 @@ __pycache__/
 !AIlibrary/frontend/.env
 .temp/
 book_index.json
-dist/
 *.pyc

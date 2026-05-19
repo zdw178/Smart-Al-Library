@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import asyncio
 import json
 import os
@@ -435,6 +436,11 @@ async def smart_search(query: str = Query(..., description="自然语言搜索�
         "recommendation": deepseek_result.get("recommendation", f"系统基于您查询的「{rewritten_query}」，为您匹配了以下书籍。"),
         "tags": deepseek_result.get("tags", [])
     }
+
+# 托管前端静态文件（生产环境用）
+frontend_dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+if os.path.exists(frontend_dist):
+    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
 
 if __name__ == "__main__":
     import uvicorn
