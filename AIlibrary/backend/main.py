@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import FileResponse
 import asyncio
 import json
 import os
@@ -356,6 +357,10 @@ def gemini_web_search(query: str) -> str:
 
 @app.get("/")
 def read_root():
+    frontend_index = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist", "index.html")
+    frontend_index = os.path.abspath(frontend_index)
+    if os.path.exists(frontend_index):
+        return FileResponse(frontend_index)
     return {"message": "SmartLib AI Backend is Running with RAG Vector Search + Jieba"}
 
 @app.get("/health")
@@ -443,23 +448,29 @@ print(f"[Startup] Books loaded: {len(local_books)}")
 print(f"[Startup] DeepSeek API Key: {'configured' if os.getenv('DEEPSEEK_API_KEY') else 'MISSING'}")
 
 # 托管前端静态文件（生产环境用）
-# __file__ 是 main.py 的绝对路径，所以相对路径基于 backend/ 目录
 frontend_dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 frontend_dist = os.path.abspath(frontend_dist)
 print(f"[Startup] Frontend dist path: {frontend_dist}")
 print(f"[Startup] Dist exists: {os.path.exists(frontend_dist)}")
+
 if os.path.exists(frontend_dist):
-    try:
-        app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
-        print("[Startup] Frontend static files mounted successfully")
-    except Exception as e:
-        print(f"[Startup] Failed to mount frontend: {e}")
+    # 只挂载 assets 子目录，避免拦截 API 路由
+    assets_dir = os.path.join(frontend_dist, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
+        print("[Startup] Frontend assets mounted at /assets")
+
+    # SPA 兜底：非 API 路径返回 index.html，API 路由优先
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        file_path = os.path.join(frontend_dist, full_path)
+        if full_path and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(frontend_dist, "index.html"))
+
+    print("[Startup] SPA fallback route configured")
 else:
     print("[Startup] WARNING: frontend/dist not found, only API routes available")
-    # 确保 API 路由不被影响
-    @app.get("/")
-    def root_fallback():
-        return {"message": "SmartLib API is running. Frontend not deployed."}
 
 
 if __name__ == "__main__":
