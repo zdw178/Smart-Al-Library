@@ -18,10 +18,20 @@ load_dotenv()
 
 app = FastAPI()
 
-deepseek_client = OpenAI(
-    api_key=os.getenv("DEEPSEEK_API_KEY", ""),
-    base_url="https://api.deepseek.com"
-)
+_deepseek_client = None
+
+def get_deepseek_client():
+    global _deepseek_client
+    if _deepseek_client is None:
+        api_key = os.getenv("DEEPSEEK_API_KEY", "")
+        if api_key:
+            _deepseek_client = OpenAI(
+                api_key=api_key,
+                base_url="https://api.deepseek.com"
+            )
+        else:
+            _deepseek_client = False  # 标记为不可用
+    return _deepseek_client if _deepseek_client is not False else None
 
 app.add_middleware(
     CORSMiddleware,
@@ -57,7 +67,10 @@ def rewrite_query_with_llm(query: str) -> str:
         return query
     
     try:
-        response = deepseek_client.chat.completions.create(
+        client = get_deepseek_client()
+        if not client:
+            return query
+        response = client.chat.completions.create(
             model="deepseek-chat",
             messages=[
                 {
@@ -93,7 +106,10 @@ def search_real_books_with_deepseek(query: str) -> list:
         return []
 
     try:
-        response = deepseek_client.chat.completions.create(
+        client = get_deepseek_client()
+        if not client:
+            return []
+        response = client.chat.completions.create(
             model="deepseek-chat",
             messages=[
                 {
@@ -248,7 +264,13 @@ def generate_recommendation_with_deepseek(query: str, books: list) -> dict:
     ])
     
     try:
-        response = deepseek_client.chat.completions.create(
+        client = get_deepseek_client()
+        if not client:
+            return {
+                "recommendation": f"系统基于您查询的「{query}」，为您匹配了以下书籍。",
+                "tags": []
+            }
+        response = client.chat.completions.create(
             model="deepseek-chat",
             messages=[
                 {
