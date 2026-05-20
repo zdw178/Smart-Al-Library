@@ -2,9 +2,10 @@ services:
   - type: web
     name: smartlib-backend
     runtime: python
-    rootDir: AIlibrary/backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    rootDir: .
+    buildCommand: |
+      cd AIlibrary/frontend && npm install && npm run build && cd ../backend && pip install -r requirements.txt
+    startCommand: cd AIlibrary/backend && uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DEEPSEEK_API_KEY
         sync: false
