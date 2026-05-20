@@ -4,7 +4,9 @@
       "Bash(curl -sI --connect-timeout 10 https://smartlib-backend.onrender.com/)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(curl -s --connect-timeout 10 https://smartlib-backend.onrender.com/health)",
+      "Bash(curl -s --connect-timeout 10 https://smart-al-library1.onrender.com/api/discovery)"
     ]
   }
 }

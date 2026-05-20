@@ -435,7 +435,7 @@ const performSearch = async () => {
         : '/api/search/smart'
     
     try {
-      const apiBase = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8001'
+      const apiBase = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8001'
       const response = await fetchWithTimeout(apiBase + endpoint + '?query=' + encodeURIComponent(searchQuery.value), 15000)
       if (!response.ok) {
         throw new Error('Search failed')
@@ -517,7 +517,7 @@ const loadDiscoveryBooks = async () => {
 
   // 2. 后台请求快速发现端点（不经过 LLM，秒级响应）
   try {
-    const apiBase = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8001'
+    const apiBase = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8001'
     const response = await fetchWithTimeout(apiBase + '/api/discovery', 8000)
     if (response.ok) {
       const data = await response.json()
